@@ -46,7 +46,13 @@ class QualityThresholds {
 /// The mean of every pixel in [img]. An empty image (`width * height == 0`)
 /// has a mean brightness of `0.0`.
 double meanBrightness(GrayImage img) {
-  throw UnimplementedError('meanBrightness');
+  if (img.pixels.isEmpty) return 0.0;
+
+  var total = 0;
+  for (final pixel in img.pixels) {
+    total += pixel;
+  }
+  return total / img.pixels.length;
 }
 
 /// The population variance of the discrete Laplacian `L = top + bottom +
@@ -54,7 +60,29 @@ double meanBrightness(GrayImage img) {
 /// away from every edge). Images narrower or shorter than 3 pixels, which
 /// have no interior pixel, return `0.0`.
 double laplacianVariance(GrayImage img) {
-  throw UnimplementedError('laplacianVariance');
+  if (img.width < 3 || img.height < 3) return 0.0;
+
+  var count = 0;
+  var mean = 0.0;
+  var sumOfSquaredDeviations = 0.0;
+  for (var row = 1; row < img.height - 1; row++) {
+    final rowOffset = row * img.width;
+    for (var column = 1; column < img.width - 1; column++) {
+      final index = rowOffset + column;
+      final laplacian =
+          img.pixels[index - img.width] +
+          img.pixels[index + img.width] +
+          img.pixels[index - 1] +
+          img.pixels[index + 1] -
+          4 * img.pixels[index];
+      count++;
+      final delta = laplacian - mean;
+      mean += delta / count;
+      sumOfSquaredDeviations += delta * (laplacian - mean);
+    }
+  }
+
+  return sumOfSquaredDeviations / count;
 }
 
 /// The quality problems with [img] against [thresholds], in [QualityIssue]
@@ -64,5 +92,20 @@ List<QualityIssue> checkQuality(
   GrayImage img, {
   QualityThresholds thresholds = const QualityThresholds(),
 }) {
-  throw UnimplementedError('checkQuality');
+  if (img.width < thresholds.minWidth || img.height < thresholds.minHeight) {
+    return [QualityIssue.tooSmall];
+  }
+
+  final issues = <QualityIssue>[];
+  final brightness = meanBrightness(img);
+  if (brightness < thresholds.darkBelow) {
+    issues.add(QualityIssue.tooDark);
+  }
+  if (brightness > thresholds.brightAbove) {
+    issues.add(QualityIssue.tooBright);
+  }
+  if (laplacianVariance(img) < thresholds.minSharpness) {
+    issues.add(QualityIssue.blurry);
+  }
+  return issues;
 }

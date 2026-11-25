@@ -59,22 +59,49 @@ class CameraPermissionFlow {
 
   /// Called when the user taps the button that starts photo capture.
   Future<PermissionDecision> onCaptureTapped() async {
-    throw UnimplementedError('onCaptureTapped');
+    switch (await _gateway.status()) {
+      case CameraPermissionState.granted:
+      case CameraPermissionState.limited:
+        return const Proceed();
+      case CameraPermissionState.restricted:
+        return const Unavailable(canAskAgain: false);
+      case CameraPermissionState.permanentlyDenied:
+        return const ShowSettingsHelp();
+      case CameraPermissionState.denied:
+        if (await _gateway.shouldShowRationale()) {
+          return const ShowRationale();
+        }
+        return _decisionFor(await _gateway.request());
+    }
   }
 
   /// Called after the user accepts the app's own rationale card.
   Future<PermissionDecision> onRationaleAccepted() async {
-    throw UnimplementedError('onRationaleAccepted');
+    return _decisionFor(await _gateway.request());
   }
 
   /// Called when the user dismisses the rationale card without proceeding.
   /// Never touches the gateway.
   Future<PermissionDecision> onRationaleDeclined() async {
-    throw UnimplementedError('onRationaleDeclined');
+    return const Unavailable(canAskAgain: true);
   }
 
   /// The only method that may open the system settings screen.
   Future<bool> onOpenSettingsTapped() {
-    throw UnimplementedError('onOpenSettingsTapped');
+    return _gateway.openSettings();
+  }
+
+  PermissionDecision _decisionFor(CameraPermissionState state) {
+    switch (state) {
+      case CameraPermissionState.granted:
+      case CameraPermissionState.limited:
+        return const Proceed();
+      case CameraPermissionState.permanentlyDenied:
+        return const ShowSettingsHelp();
+      case CameraPermissionState.restricted:
+        return const Unavailable(canAskAgain: false);
+      case CameraPermissionState.denied:
+        return const Unavailable(canAskAgain: true);
+    }
   }
 }

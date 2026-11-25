@@ -4,6 +4,7 @@
 /// and the semantics label `CaptureGuide` must expose.
 import 'package:flutter/material.dart';
 
+import '../capture/capture_angle.dart';
 import '../capture/capture_session.dart';
 
 class CaptureGuide extends StatelessWidget {
@@ -13,6 +14,23 @@ class CaptureGuide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    throw UnimplementedError('CaptureGuide.build');
+    return ListenableBuilder(
+      listenable: session,
+      builder: (context, child) {
+        final next = session.nextRequiredAngle;
+        if (next == null) {
+          return const Text('Capture complete', key: Key('capture-complete'));
+        }
+
+        final step = CaptureAngle.values.indexOf(next) + 1;
+        final label = angleLabel(next);
+        return Semantics(
+          key: const Key('capture-step'),
+          label: 'Step $step of 8: $label',
+          excludeSemantics: true,
+          child: Text(label, key: const Key('capture-instruction')),
+        );
+      },
+    );
   }
 }

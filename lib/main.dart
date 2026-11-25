@@ -9,7 +9,6 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import 'capture/capture_angle.dart';
 import 'capture/capture_session.dart';
 import 'capture/quality_checker.dart';
 import 'permissions/camera_permission_flow.dart';

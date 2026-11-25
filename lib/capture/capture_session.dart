@@ -3,12 +3,11 @@
 ///
 /// TODO(intern): implement CaptureSession. CaptureResult and its subclasses
 /// are given.
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 
 import 'capture_angle.dart';
 import 'quality_checker.dart';
+import '../evidence/evidence.dart';
 
 /// The outcome of submitting one photo. Given: do not change.
 sealed class CaptureResult {
@@ -40,15 +39,22 @@ class CaptureSession extends ChangeNotifier {
   CaptureSession({this.maxCloseUps = 6});
 
   final int maxCloseUps;
+  final Map<CaptureAngle, String> _acceptedAngles = {};
+  final List<String> _closeUps = [];
 
   /// The first angle, in enum order, with no accepted photo. `null` once
   /// every angle has one.
-  CaptureAngle? get nextRequiredAngle => throw UnimplementedError('nextRequiredAngle');
+  CaptureAngle? get nextRequiredAngle {
+    for (final angle in CaptureAngle.values) {
+      if (!_acceptedAngles.containsKey(angle)) return angle;
+    }
+    return null;
+  }
 
-  bool get isComplete => throw UnimplementedError('isComplete');
+  bool get isComplete => _acceptedAngles.length == CaptureAngle.values.length;
 
   /// Accepted angles out of the 8 required, as a fraction.
-  double get progress => throw UnimplementedError('progress');
+  double get progress => _acceptedAngles.length / CaptureAngle.values.length;
 
   /// Submits a photo for [angle]. Rejects on quality issues first; then, if
   /// [angle] already has an accepted photo, throws [StateError] (a plain
@@ -59,17 +65,42 @@ class CaptureSession extends ChangeNotifier {
     Uint8List bytes,
     List<QualityIssue> issues,
   ) {
-    throw UnimplementedError('submit');
+    if (issues.isNotEmpty) return Rejected(List.unmodifiable(issues));
+    if (_acceptedAngles.containsKey(angle)) {
+      throw StateError('An accepted photo already exists for $angle.');
+    }
+
+    final digest = sha256Hex(bytes);
+    for (final entry in _acceptedAngles.entries) {
+      if (entry.value == digest) return Duplicate(entry.key);
+    }
+    if (_closeUps.contains(digest)) return const Duplicate(null);
+
+    _acceptedAngles[angle] = digest;
+    notifyListeners();
+    return const Accepted();
   }
 
   /// Removes the accepted photo for [angle] (if any), reopening it.
   void retake(CaptureAngle angle) {
-    throw UnimplementedError('retake');
+    if (_acceptedAngles.remove(angle) != null) notifyListeners();
   }
 
   /// Adds a close-up. Same quality and duplicate rules as [submit]; once
   /// [maxCloseUps] close-ups are accepted, further calls throw [StateError].
   CaptureResult addCloseUp(Uint8List bytes, List<QualityIssue> issues) {
-    throw UnimplementedError('addCloseUp');
+    if (issues.isNotEmpty) return Rejected(List.unmodifiable(issues));
+    if (_closeUps.length >= maxCloseUps) {
+      throw StateError('The maximum number of close-ups has been reached.');
+    }
+
+    final digest = sha256Hex(bytes);
+    for (final entry in _acceptedAngles.entries) {
+      if (entry.value == digest) return Duplicate(entry.key);
+    }
+    if (_closeUps.contains(digest)) return const Duplicate(null);
+
+    _closeUps.add(digest);
+    return const Accepted();
   }
 }
